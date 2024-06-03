@@ -893,6 +893,41 @@ var _ = ginkgo.Describe("[Tx Processing]", func() {
 			require.Equal(balance, bbalance+100)
 		})
 	})
+
+	ginkgo.It("Executes burn action", func() {
+		ginkgo.By("check balance", func() {
+			balance, err := instances[0].lcli.Balance(context.Background(), addrStr)
+			require.NoError(err)
+			require.Equal(balance, uint64(9_894_773))
+		})
+
+		ginkgo.By("issue TransferTx", func() {
+			parser, err := instances[0].lcli.Parser(context.Background())
+			require.NoError(err)
+			submit, _, _, err := instances[0].cli.GenerateTransaction(
+				context.Background(),
+				parser,
+				[]chain.Action{&actions.Burn{
+					Value: 1_000_000, // must be more than StateLockup
+				}},
+				factory,
+			)
+			require.NoError(err)
+			require.NoError(submit(context.Background()))
+
+			accept := expectBlk(instances[0])
+			results := accept(false)
+			require.Len(results, 1)
+			require.True(results[0].Success)
+		})
+
+		ginkgo.By("check final balance", func() {
+			balance, err := instances[0].lcli.Balance(context.Background(), addrStr)
+			require.NoError(err)
+			require.Equal(balance, uint64(9_894_773-207-1_000_000)) // 8894566
+		})
+
+	})
 })
 
 func expectBlk(i instance) func(bool) []*chain.Result {
